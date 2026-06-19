@@ -1,0 +1,136 @@
+name: Release
+
+# On a push to main: read versionName from app/build.gradle.kts and, ONLY if the
+# matching tag doesn't exist yet (i.e. you bumped the version), build the FOSS release
+# APKs and cut a GitHub Release with the tag. Plain commits (version unchanged) do
+# nothing. Mirrors the GitLab pipeline (.gitlab-ci.yml).
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write          # softprops/action-gh-release creates the tag + release
+
+env:
+  SING_BOX_TAG: "v1.13.13"
+  LIBBOX_CACHE_REV: "2"    # bump to force a fresh libbox.aar rebuild (busts the cache)
+  GO_VERSION: "1.24.7"
+  NDK_VERSION: "28.0.13004108"
+  ANDROID_COMPILE_SDK: "37.0"
+  BUILD_TOOLS: "36.1.0"
+  CMAKE_VERSION: "3.22.1"
+  GOTOOLCHAIN: "local"
+
+jobs:
+  # ── Decide whether to release: only when v<versionName> has no tag yet. ──────────
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      should_release: ${{ steps.v.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          VERSION="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n1)"
+          [ -n "$VERSION" ] || { echo "versionName not found in app/build.gradle.kts"; exit 1; }
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists — version not bumped, nothing to release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version bumped to $VERSION — will build and release v$VERSION."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Build sing-box's libbox.aar (3 ABIs). Cached by sing-box tag + rev. ──────────
+  libbox:
+    needs: check
+    if: needs.check.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: app/libs/libbox.aar
+          key: libbox-${{ env.SING_BOX_TAG }}-${{ env.LIBBOX_CACHE_REV }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: android-actions/setup-android@v3
+      - name: Provision NDK + gomobile and build libbox
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          # android-36 (integer-named) is for gomobile, which can't parse the preview
+          # "android-37.0" platform name. --channel=3 (canary) is needed for android-37.0.
+          sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "platforms;android-36" "ndk;${NDK_VERSION}"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${NDK_VERSION}"
+          go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+          go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          bash scripts/build-libbox.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libbox
+          path: app/libs/libbox.aar
+          retention-days: 1
+
+  # ── Build the release APKs (arm64 + x86_64 + armv7 + universal), signed. ─────────
+  build:
+    needs: [check, libbox]
+    if: needs.check.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: libbox
+          path: app/libs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${BUILD_TOOLS}" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+      - name: Assemble release
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${NDK_VERSION}"
+          ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apks
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 7
+
+  # ── Create the tag + GitHub Release with the four APKs attached. ─────────────────
+  release:
+    needs: [check, build]
+    if: needs.check.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apks
+          path: apks
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ needs.check.outputs.version }}"
+          name: "FRKN v${{ needs.check.outputs.version }}"
+          body: "Automated FOSS release build for v${{ needs.check.outputs.version }}."
+          files: apks/*.apk

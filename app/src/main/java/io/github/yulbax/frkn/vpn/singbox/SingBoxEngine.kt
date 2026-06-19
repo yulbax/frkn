@@ -1,0 +1,213 @@
+package io.github.yulbax.frkn.vpn.singbox
+
+import android.content.Context
+import android.util.Log
+import io.github.yulbax.frkn.vpn.DefaultNetworkMonitor
+import io.github.yulbax.frkn.vpn.core.EngineConfig
+import io.github.yulbax.frkn.vpn.core.EngineListener
+import io.github.yulbax.frkn.vpn.core.TunAddress
+import io.github.yulbax.frkn.vpn.core.TunConfig
+import io.github.yulbax.frkn.vpn.core.TunPlatform
+import io.github.yulbax.frkn.vpn.core.VpnEngine
+import io.github.yulbax.frkn.vpn.core.freeLoopbackPort
+import io.github.yulbax.frkn.util.FrknLog
+import java.security.SecureRandom
+import libbox.CommandClient
+import libbox.CommandClientHandler
+import libbox.CommandClientOptions
+import libbox.CommandServer
+import libbox.CommandServerHandler
+import libbox.ConnectionEvents
+import libbox.ConnectionOwner
+import libbox.InterfaceUpdateListener
+import libbox.Libbox
+import libbox.LogIterator
+import libbox.OutboundGroupIterator
+import libbox.OverrideOptions
+import libbox.SetupOptions
+import libbox.StatusMessage
+import libbox.StringIterator
+import libbox.SystemProxyStatus
+import libbox.TunOptions
+import java.io.File
+
+class SingBoxEngine(
+    appContext: Context,
+    private val tunPlatform: TunPlatform,
+    private val networkMonitor: DefaultNetworkMonitor,
+    private val listener: EngineListener,
+    private val log: FrknLog
+) : VpnEngine, FrknPlatformInterface, CommandServerHandler {
+
+    override val probeSocksPort: Int = freeLoopbackPort()
+    override val probeUsername: String = randomToken()
+    override val probePassword: String = randomToken()
+
+    private var commandServer: CommandServer? = null
+    private var commandClient: CommandClient? = null
+
+    private val workDir = File(appContext.filesDir, "work")
+    private val boxLogFile = File(workDir, "box.log")
+
+    init {
+        runCatching { go.Seq.setContext(appContext) }
+        runCatching {
+            Libbox.setup(SetupOptions().apply {
+                workDir.mkdirs()
+                basePath = appContext.filesDir.absolutePath
+                workingPath = workDir.absolutePath
+                tempPath = appContext.cacheDir.absolutePath
+            })
+        }.onFailure { log.e(TAG, "Libbox.setup failed", it) }
+    }
+
+    override fun start(config: EngineConfig) {
+        runCatching { boxLogFile.takeIf { it.exists() }?.writeText("") }
+        val server = Libbox.newCommandServer(this, this)
+        server.start()
+        server.startOrReloadService(buildConfig(config), OverrideOptions())
+        commandServer = server
+        startCommandClient()
+    }
+
+    override fun reloadRouting(config: EngineConfig) {
+        commandServer?.startOrReloadService(buildConfig(config), OverrideOptions())
+    }
+
+    override fun selectProxy(tag: String): Boolean = runCatching {
+        Libbox.newStandaloneCommandClient().selectOutbound(ConfigBuilder.PROXY_GROUP_TAG, tag)
+    }.isSuccess
+
+    override fun stop() {
+        runCatching { commandClient?.disconnect() }
+        commandClient = null
+        runCatching { commandServer?.closeService() }
+        runCatching { commandServer?.close() }
+        commandServer = null
+    }
+
+    private fun buildConfig(config: EngineConfig): String =
+        ConfigBuilder.build(
+            proxies = config.proxies,
+            activeProxyTag = config.activeProxyTag,
+            byeDpiPackages = config.byeDpiPackages,
+            vpnPackages = config.vpnPackages,
+            tunneledPackages = config.tunneledPackages,
+            byeDpiPort = config.byeDpiSocksPort,
+            probePort = probeSocksPort,
+            probeUser = probeUsername,
+            probePass = probePassword,
+            options = config.network
+        )
+
+    private val clientHandler = object : CommandClientHandler {
+        override fun writeStatus(status: StatusMessage) {
+            listener.onThroughput(status.uplink, status.downlink)
+        }
+
+        override fun writeGroups(groups: OutboundGroupIterator) {}
+        override fun connected() {}
+        override fun disconnected(message: String) {}
+        override fun clearLogs() {}
+        override fun initializeClashMode(modes: StringIterator, current: String) {}
+        override fun setDefaultLogLevel(level: Int) {}
+        override fun updateClashMode(mode: String) {}
+        override fun writeConnectionEvents(events: ConnectionEvents) {}
+        override fun writeLogs(logs: LogIterator) {}
+    }
+
+    private fun startCommandClient() {
+        val options = CommandClientOptions().apply {
+            statusInterval = 1_000_000_000L
+            addCommand(Libbox.CommandStatus)
+        }
+        val client = Libbox.newCommandClient(clientHandler, options)
+        runCatching { client.connect() }
+            .onSuccess { commandClient = client }
+            .onFailure { log.e(TAG, "command client connect failed", it) }
+    }
+
+    override fun openTun(options: TunOptions): Int {
+        val inet4 = mutableListOf<TunAddress>()
+        options.inet4Address.let { while (it.hasNext()) it.next().let { a -> inet4.add(TunAddress(a.address(), a.prefix())) } }
+        val inet6 = mutableListOf<TunAddress>()
+        options.inet6Address.let { while (it.hasNext()) it.next().let { a -> inet6.add(TunAddress(a.address(), a.prefix())) } }
+        val autoRoute = options.autoRoute
+        val dnsServers = mutableListOf<String>()
+        if (autoRoute) {
+            runCatching { options.getDNSServerAddress().value }
+                .getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { dnsServers.add(it) }
+        }
+        val includePkgs = mutableListOf<String>()
+        val excludePkgs = mutableListOf<String>()
+        if (autoRoute) {
+            options.includePackage.let { while (it.hasNext()) includePkgs.add(it.next()) }
+            options.excludePackage.let { while (it.hasNext()) excludePkgs.add(it.next()) }
+        }
+        return tunPlatform.openTun(
+            TunConfig(
+                mtu = options.mtu,
+                inet4 = inet4,
+                inet6 = inet6,
+                autoRoute = autoRoute,
+                dnsServers = dnsServers,
+                includePackages = includePkgs,
+                excludePackages = excludePkgs
+            )
+        )
+    }
+
+    override fun autoDetectInterfaceControl(fd: Int) {
+        tunPlatform.protectFd(fd)
+    }
+
+    override fun findConnectionOwner(
+        ipProtocol: Int,
+        sourceAddress: String,
+        sourcePort: Int,
+        destinationAddress: String,
+        destinationPort: Int
+    ): ConnectionOwner {
+        val owner = tunPlatform.findConnectionOwner(
+            ipProtocol, sourceAddress, sourcePort, destinationAddress, destinationPort
+        )
+        return ConnectionOwner().apply {
+            userId = owner.uid
+            userName = owner.packageNames.firstOrNull() ?: ""
+            setAndroidPackageNames(StringArray(owner.packageNames.iterator()))
+        }
+    }
+
+    override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
+        networkMonitor.setListener { name, index ->
+            listener.updateDefaultInterface(name, index, false, false)
+        }
+    }
+
+    override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
+        networkMonitor.setListener(null)
+    }
+
+    override fun serviceStop() {
+        listener.onStopRequested()
+    }
+
+    override fun serviceReload() {}
+    override fun getSystemProxyStatus(): SystemProxyStatus = SystemProxyStatus()
+    override fun setSystemProxyEnabled(enabled: Boolean) {}
+    override fun writeDebugMessage(message: String) {
+        Log.d(TAG, message)
+    }
+
+    private companion object {
+        const val TAG = "SingBoxEngine"
+
+        fun randomToken(): String {
+            val bytes = ByteArray(12)
+            SecureRandom().nextBytes(bytes)
+            return bytes.joinToString("") { "%02x".format(it) }
+        }
+    }
+}
