@@ -142,7 +142,7 @@ class SingBoxEngine(
         val autoRoute = options.autoRoute
         val dnsServers = mutableListOf<String>()
         if (autoRoute) {
-            runCatching { options.getDNSServerAddress().value }
+            runCatching { options.dnsServerAddress.value }
                 .getOrNull()
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { dnsServers.add(it) }

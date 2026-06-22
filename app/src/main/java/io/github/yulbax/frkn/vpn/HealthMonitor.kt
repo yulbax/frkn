@@ -20,6 +20,7 @@ class HealthMonitor(
         scope: CoroutineScope,
         engine: VpnEngine,
         byeDpiPort: Int?,
+        vpnActive: Boolean,
         onRefreshSubscription: suspend () -> Unit,
         onRecoveryReload: suspend () -> Unit,
         onByedpiUp: suspend () -> Unit,
@@ -66,17 +67,22 @@ class HealthMonitor(
                     )
                 }
 
-                if (vpnUp || byedpiUp) {
+                val byedpiActive = byeDpiPort != null
+                val anyUp = vpnUp || byedpiUp
+                val allActiveUp = (!vpnActive || vpnUp) && (!byedpiActive || byedpiUp)
+
+                if (anyUp) stateRepository.update(VpnState.Connected(vpnDelay ?: byedpiDelay ?: 0))
+
+                if (allActiveUp) {
                     failures = 0
-                    stateRepository.update(VpnState.Connected(vpnDelay ?: byedpiDelay ?: 0))
                     delay((if (vpnUp) HEALTH_INTERVAL_MS else HEALTH_RETRY_MS).milliseconds)
                 } else {
                     failures++
                     if (isFingerprintError()) {
-                        stateRepository.update(VpnState.CyclingFingerprint(failures))
+                        if (!anyUp) stateRepository.update(VpnState.CyclingFingerprint(failures))
                         onRecoveryReload()
                     } else {
-                        stateRepository.update(VpnState.Reconnecting(failures))
+                        if (!anyUp) stateRepository.update(VpnState.Reconnecting(failures))
                         if (failures % REFRESH_SUBSCRIPTION_AFTER_FAILURES == 0) onRefreshSubscription()
                         if (failures % RELOAD_EVERY_N_FAILURES == 0) onRecoveryReload()
                     }

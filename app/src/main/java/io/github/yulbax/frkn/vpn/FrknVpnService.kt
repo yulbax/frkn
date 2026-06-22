@@ -83,6 +83,7 @@ class FrknVpnService :
 
     private var activeConfigName: String = ""
     private var byeDpiPort: Int = ByeDpi.DEFAULT_PORT
+    private var vpnActive: Boolean = false
     private var appliedMembershipKey = ""
     private var appliedRoutingKey = ""
     private var appliedSelectedTag = ""
@@ -175,6 +176,7 @@ class FrknVpnService :
             .map { it.packageName }
         val tunneledPackages = byeDpiPackages + vpnPackages
         if (tunneledPackages.isEmpty()) error("No apps assigned to VPN or ByeDPI")
+        vpnActive = vpnPackages.isNotEmpty()
 
         val selectedTag = proxyTag(selectedProfile.id)
         appliedMembershipKey = membershipKey(profiles)
@@ -308,6 +310,7 @@ class FrknVpnService :
             scope = scope,
             engine = engine,
             byeDpiPort = byeDpiPort.takeIf { byeDpi != null },
+            vpnActive = vpnActive,
             onRefreshSubscription = { refreshSubscription(db) },
             onRecoveryReload = { commandBus.recover() },
             onByedpiUp = { commandBus.checkByeDpi() },
