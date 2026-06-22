@@ -10,6 +10,7 @@ data class ConnectionStats(
     val vpnUp: Boolean = false,
     val vpnLatencyMs: Int = 0,
     val vpnCountry: String = "",
+    val vpnCycling: Boolean = false,
     val byedpiActive: Boolean = false,
     val byedpiUp: Boolean = false,
     val byedpiLatencyMs: Int = 0,

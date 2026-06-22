@@ -55,39 +55,43 @@ class HealthMonitor(
                 if (byedpiUp && !wasByedpiUp) onByedpiUp()
                 wasByedpiUp = byedpiUp
 
+                val byedpiActive = byeDpiPort != null
+                val anyUp = vpnUp || byedpiUp
+                val allActiveUp = (!vpnActive || vpnUp) && (!byedpiActive || byedpiUp)
+                val fpError = isFingerprintError()
+
                 stateRepository.updateStats {
                     it.copy(
                         vpnUp = vpnUp,
                         vpnLatencyMs = vpnDelay ?: 0,
                         vpnCountry = vpnCountry,
-                        byedpiActive = byeDpiPort != null,
+                        vpnCycling = vpnActive && !vpnUp && fpError,
+                        byedpiActive = byedpiActive,
                         byedpiUp = byedpiUp,
                         byedpiLatencyMs = byedpiDelay ?: 0,
                         byedpiCountry = byedpiCountry
                     )
                 }
 
-                val byedpiActive = byeDpiPort != null
-                val anyUp = vpnUp || byedpiUp
-                val allActiveUp = (!vpnActive || vpnUp) && (!byedpiActive || byedpiUp)
+                if (allActiveUp) failures = 0 else failures++
 
-                if (anyUp) stateRepository.update(VpnState.Connected(vpnDelay ?: byedpiDelay ?: 0))
-
-                if (allActiveUp) {
-                    failures = 0
-                    delay((if (vpnUp) HEALTH_INTERVAL_MS else HEALTH_RETRY_MS).milliseconds)
+                if (anyUp) {
+                    stateRepository.update(VpnState.Connected(vpnDelay ?: byedpiDelay ?: 0))
                 } else {
-                    failures++
-                    if (isFingerprintError()) {
-                        if (!anyUp) stateRepository.update(VpnState.CyclingFingerprint(failures))
+                    stateRepository.update(VpnState.Reconnecting(failures))
+                }
+
+                if (!allActiveUp) {
+                    if (fpError) {
                         onRecoveryReload()
                     } else {
-                        if (!anyUp) stateRepository.update(VpnState.Reconnecting(failures))
                         if (failures % REFRESH_SUBSCRIPTION_AFTER_FAILURES == 0) onRefreshSubscription()
                         if (failures % RELOAD_EVERY_N_FAILURES == 0) onRecoveryReload()
                     }
-                    delay(HEALTH_RETRY_MS.milliseconds)
                 }
+
+                val interval = if (allActiveUp && vpnUp) HEALTH_INTERVAL_MS else HEALTH_RETRY_MS
+                delay(interval.milliseconds)
             }
         }
     }

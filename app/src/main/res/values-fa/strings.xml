@@ -83,12 +83,13 @@
     <string name="vpn_checking_connectivity">در حال بررسی اتصال</string>
     <string name="vpn_tap_to_disconnect">برای قطع بزنید</string>
     <string name="vpn_attempt">تلاش %1$d</string>
-    <string name="vpn_cycling_fingerprint">در حال تنظیم…</string>
-    <string name="vpn_cycling_fingerprint_sub">در حال آزمودن اثرانگشت‌های TLS… (%1$d)</string>
     <string name="toggle_connection_cd">تغییر وضعیت اتصال</string>
     <string name="channel_status_off">خاموش</string>
     <string name="channel_status_online">آنلاین · %1$d میلی‌ثانیه</string>
     <string name="channel_status_no_internet">بدون اینترنت</string>
+    <string name="channel_status_connecting">در حال اتصال…</string>
+    <string name="channel_status_generating_fp">در حال ساخت اثر انگشت…</string>
+    <string name="channel_status_no_apps">برنامه‌ای انتخاب نشده</string>
     <string name="byedpi_test_title">آزمایش دور زدن ByeDPI</string>
     <string name="byedpi_test_summary">%1$d قابل دسترس · %2$d از %3$d بررسی شد</string>
     <string name="byedpi_test_full">آزمایش کامل (%1$d)</string>

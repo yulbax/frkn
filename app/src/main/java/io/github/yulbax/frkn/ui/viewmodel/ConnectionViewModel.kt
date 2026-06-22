@@ -28,7 +28,9 @@ import kotlinx.coroutines.launch
 
 data class FrknUiState(
     val homeHintSeen: Boolean = true,
-    val hasRoutedApps: Boolean = false
+    val hasRoutedApps: Boolean = false,
+    val hasVpnApps: Boolean = false,
+    val hasByedpiApps: Boolean = false
 )
 
 class ConnectionViewModel(
@@ -41,14 +43,12 @@ class ConnectionViewModel(
 
     val uiState: StateFlow<FrknUiState> = combine(
         settingsDao.observeSettings().map { it?.homeHintSeen ?: false },
-        appDao.getAllApps().map { apps ->
-            apps.any {
-                it.connectionType == ConnectionType.VPN ||
-                    it.connectionType == ConnectionType.BYEDPI
-            }
-        }
-    ) { homeHintSeen, hasRoutedApps -> FrknUiState(homeHintSeen, hasRoutedApps) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FrknUiState())
+        appDao.getAllApps()
+    ) { homeHintSeen, apps ->
+        val hasVpn = apps.any { it.connectionType == ConnectionType.VPN }
+        val hasByedpi = apps.any { it.connectionType == ConnectionType.BYEDPI }
+        FrknUiState(homeHintSeen, hasVpn || hasByedpi, hasVpn, hasByedpi)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FrknUiState())
 
     fun dismissHomeHint() {
         viewModelScope.launch {

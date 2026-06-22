@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -43,25 +44,45 @@ internal fun ChannelStatusCard(
     type: ConnectionType,
     active: Boolean,
     up: Boolean,
+    hasApps: Boolean,
     latencyMs: Int,
     country: String,
     shape: Shape,
     modifier: Modifier = Modifier,
+    cycling: Boolean = false,
     reachable: Int = 0,
     total: Int = 0,
     checking: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
+    val reconnecting = hasApps && active && !up
+    val reconnectColor = Color(0xFFF9A825)
     val dotColor = when {
+        !hasApps -> MaterialTheme.colorScheme.outline
         !active -> MaterialTheme.colorScheme.outline
         up -> Color(0xFF4CAF50)
-        else -> MaterialTheme.colorScheme.error
+        else -> reconnectColor
     }
     val statusLine = when {
+        !hasApps -> stringResource(R.string.channel_status_no_apps)
         !active -> stringResource(R.string.channel_status_off)
         up -> stringResource(R.string.channel_status_online, latencyMs)
-        else -> stringResource(R.string.channel_status_no_internet)
+        cycling -> stringResource(R.string.channel_status_generating_fp)
+        else -> stringResource(R.string.channel_status_connecting)
     }
+    val statusColor = if (reconnecting) reconnectColor else MaterialTheme.colorScheme.onSurfaceVariant
+    val dotAlpha = if (reconnecting) {
+        val transition = rememberInfiniteTransition(label = "reconnect")
+        transition.animateFloat(
+            initialValue = 0.3f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(700, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "reconnectAlpha"
+        ).value
+    } else 1f
     Surface(
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -78,6 +99,7 @@ internal fun ChannelStatusCard(
             Box(
                 modifier = Modifier
                     .size(10.dp)
+                    .alpha(dotAlpha)
                     .clip(CircleShape)
                     .background(dotColor)
             )
@@ -93,7 +115,7 @@ internal fun ChannelStatusCard(
                 Text(
                     text = statusLine,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = statusColor
                 )
             }
             when {

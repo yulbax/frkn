@@ -86,12 +86,13 @@
     <string name="vpn_checking_connectivity">Checking connectivity</string>
     <string name="vpn_tap_to_disconnect">Tap to disconnect</string>
     <string name="vpn_attempt">Attempt %1$d</string>
-    <string name="vpn_cycling_fingerprint">Adjusting…</string>
-    <string name="vpn_cycling_fingerprint_sub">Trying TLS fingerprints, please wait… (%1$d)</string>
     <string name="toggle_connection_cd">Toggle connection</string>
     <string name="channel_status_off">off</string>
     <string name="channel_status_online">online · %1$d ms</string>
     <string name="channel_status_no_internet">no internet</string>
+    <string name="channel_status_connecting">connecting…</string>
+    <string name="channel_status_generating_fp">generating FP…</string>
+    <string name="channel_status_no_apps">no apps selected</string>
     <string name="byedpi_test_title">ByeDPI bypass test</string>
     <string name="byedpi_test_summary">%1$d reachable · %2$d of %3$d tested</string>
     <string name="byedpi_test_full">Full test (%1$d)</string>

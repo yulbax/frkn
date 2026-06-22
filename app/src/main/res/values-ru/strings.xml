@@ -83,12 +83,13 @@
     <string name="vpn_checking_connectivity">Проверка соединения</string>
     <string name="vpn_tap_to_disconnect">Нажмите для отключения</string>
     <string name="vpn_attempt">Попытка %1$d</string>
-    <string name="vpn_cycling_fingerprint">Подбор…</string>
-    <string name="vpn_cycling_fingerprint_sub">Перебираем TLS-отпечатки, подождите… (%1$d)</string>
     <string name="toggle_connection_cd">Переключить подключение</string>
     <string name="channel_status_off">выкл</string>
     <string name="channel_status_online">онлайн · %1$d мс</string>
     <string name="channel_status_no_internet">нет интернета</string>
+    <string name="channel_status_connecting">подключение…</string>
+    <string name="channel_status_generating_fp">подбор отпечатка…</string>
+    <string name="channel_status_no_apps">нет приложений</string>
     <string name="byedpi_test_title">Тест обхода ByeDPI</string>
     <string name="byedpi_test_summary">%1$d доступно · проверено %2$d из %3$d</string>
     <string name="byedpi_test_full">Полный тест (%1$d)</string>

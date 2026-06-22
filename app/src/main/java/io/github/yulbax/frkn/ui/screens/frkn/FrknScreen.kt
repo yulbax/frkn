@@ -96,8 +96,7 @@ fun FrknScreen(
     }
 
     val connected = when (state) {
-        VpnState.Verifying, is VpnState.Connected, is VpnState.Reconnecting,
-        is VpnState.CyclingFingerprint -> true
+        VpnState.Verifying, is VpnState.Connected, is VpnState.Reconnecting -> true
         else -> false
     }
 
@@ -149,6 +148,8 @@ fun FrknScreen(
                 type = ConnectionType.VPN,
                 active = connected,
                 up = stats.vpnUp,
+                hasApps = ui.hasVpnApps,
+                cycling = stats.vpnCycling,
                 latencyMs = stats.vpnLatencyMs,
                 country = stats.vpnCountry,
                 shape = groupRowShape(0, 2),
@@ -158,6 +159,7 @@ fun FrknScreen(
                 type = ConnectionType.BYEDPI,
                 active = stats.byedpiActive,
                 up = stats.byedpiUp,
+                hasApps = ui.hasByedpiApps,
                 latencyMs = stats.byedpiLatencyMs,
                 country = stats.byedpiCountry,
                 shape = groupRowShape(1, 2),

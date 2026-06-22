@@ -83,12 +83,13 @@
     <string name="vpn_checking_connectivity">正在检查连接</string>
     <string name="vpn_tap_to_disconnect">点按以断开</string>
     <string name="vpn_attempt">第 %1$d 次尝试</string>
-    <string name="vpn_cycling_fingerprint">正在调整…</string>
-    <string name="vpn_cycling_fingerprint_sub">正在尝试 TLS 指纹，请稍候…（%1$d）</string>
     <string name="toggle_connection_cd">切换连接</string>
     <string name="channel_status_off">关闭</string>
     <string name="channel_status_online">在线 · %1$d 毫秒</string>
     <string name="channel_status_no_internet">无网络</string>
+    <string name="channel_status_connecting">连接中…</string>
+    <string name="channel_status_generating_fp">正在生成指纹…</string>
+    <string name="channel_status_no_apps">未选择应用</string>
     <string name="byedpi_test_title">ByeDPI 绕过测试</string>
     <string name="byedpi_test_summary">%1$d 个可达 · 已测 %2$d / %3$d</string>
     <string name="byedpi_test_full">完整测试 (%1$d)</string>
