@@ -7,14 +7,14 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.yulbax.frkn.R
 import io.github.yulbax.frkn.data.AppConfigBackup
+import io.github.yulbax.frkn.ui.components.AppDialog
 import io.github.yulbax.frkn.ui.components.ClickableRow
 import io.github.yulbax.frkn.ui.components.CommittedTextField
 import io.github.yulbax.frkn.ui.components.DropdownSetting
@@ -298,32 +299,32 @@ private fun BackupSelectionDialog(
     var apps by remember { mutableStateOf(appsAvailable) }
     var profiles by remember { mutableStateOf(profilesAvailable) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                if (settingsAvailable) {
-                    CheckRow(stringResource(R.string.settings), settings) { settings = it }
-                }
-                if (appsAvailable) {
-                    CheckRow(stringResource(R.string.applications), apps) { apps = it }
-                }
-                if (profilesAvailable) {
-                    CheckRow(stringResource(R.string.servers_title), profiles) { profiles = it }
-                }
-            }
-        },
-        confirmButton = {
+    AppDialog(
+        title = title,
+        onDismiss = onDismiss,
+        buttons = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
             TextButton(
                 enabled = settings || apps || profiles,
                 onClick = { onConfirm(Diagnostics.BackupSelection(settings, apps, profiles)) }
             ) { Text(confirmLabel) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
-    )
+    ) {
+        GroupCard(
+            itemColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            items = buildList {
+                if (settingsAvailable) {
+                    add { CheckRow(stringResource(R.string.settings), settings) { settings = it } }
+                }
+                if (appsAvailable) {
+                    add { CheckRow(stringResource(R.string.applications), apps) { apps = it } }
+                }
+                if (profilesAvailable) {
+                    add { CheckRow(stringResource(R.string.servers_title), profiles) { profiles = it } }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -331,11 +332,17 @@ private fun CheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean)
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 56.dp)
             .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-        Text(label)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        Checkbox(checked = checked, onCheckedChange = null)
     }
 }
