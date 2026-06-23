@@ -35,6 +35,7 @@ fun Apps(
     viewModel: AppsViewModel = koinViewModel()
 ) {
     val apps by viewModel.apps.collectAsState()
+    val allApps by viewModel.allApps.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val appsHintSeen by viewModel.appsHintSeen.collectAsState()
@@ -52,6 +53,7 @@ fun Apps(
                             app.packageName.contains(query, ignoreCase = true)
                 }
             }
+            val bulkTargets = if (query.isBlank()) allApps else filtered
 
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -74,8 +76,8 @@ fun Apps(
                         GlobalTypeConnectedGroup(
                             modifier = Modifier.weight(1f),
                             onSelect = { type ->
-                                val snackMsg = snackbarPattern.format(filtered.size, type.label)
-                                viewModel.setAllConnectionTypes(filtered, type)
+                                val snackMsg = snackbarPattern.format(bulkTargets.size, type.label)
+                                viewModel.setAllConnectionTypes(bulkTargets, type)
                                 scope.launch {
                                     snackbarHostState.currentSnackbarData?.dismiss()
                                     val result = snackbarHostState.showSnackbar(
@@ -84,7 +86,7 @@ fun Apps(
                                         duration = SnackbarDuration.Short
                                     )
                                     if (result == SnackbarResult.ActionPerformed) {
-                                        viewModel.restoreConnectionTypes(filtered)
+                                        viewModel.restoreConnectionTypes(bulkTargets)
                                     }
                                 }
                             }

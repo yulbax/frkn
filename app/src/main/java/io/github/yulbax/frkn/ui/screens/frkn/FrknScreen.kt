@@ -32,7 +32,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -150,15 +152,6 @@ fun FrknScreen(
             onToggle = { if (connected) viewModel.stopVpn() else onConnectClick() }
         )
 
-        if (!connected && !ui.hasRoutedApps) {
-            Spacer(Modifier.height(12.dp))
-            HintBanner(
-                text = stringResource(R.string.connection_no_routed_apps),
-                actionLabel = stringResource(R.string.home_hint_action),
-                onAction = onNavigateToApps
-            )
-        }
-
         Spacer(Modifier.height(20.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -191,6 +184,11 @@ fun FrknScreen(
                     { showByeDpiDialog = true }
                 } else null
             )
+        }
+
+        if (!connected && !ui.hasRoutedApps) {
+            Spacer(Modifier.height(12.dp))
+            AddAppsCard(onClick = onNavigateToApps)
         }
 
         if (showByeDpiDialog) {
@@ -321,6 +319,39 @@ fun FrknScreen(
             title = { Text(stringResource(R.string.dialog_error)) },
             text = { Text(message) }
         )
+    }
+}
+
+@Composable
+private fun AddAppsCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                Icons.Default.Apps,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                text = stringResource(R.string.connection_no_routed_apps),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
     }
 }
 

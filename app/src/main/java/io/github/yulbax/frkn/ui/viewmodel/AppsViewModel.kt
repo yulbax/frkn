@@ -74,6 +74,16 @@ class AppsViewModel(
             }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allApps: StateFlow<List<AppInfo>> = combine(
+        _installedApps,
+        appDao.getAllApps()
+    ) { installed, saved ->
+        val savedMap = saved.associateBy { it.packageName }
+        installed.map { app ->
+            savedMap[app.packageName]?.let { app.copy(connectionType = it.connectionType) } ?: app
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         loadInstalledApps()
     }

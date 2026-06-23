@@ -13,9 +13,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 object SocksProbe {
-    private const val GEO_URL = "https://api.country.is/"
+    private const val GEO_URL = "https://api.ipapi.is/"
     private const val PROBE_TIMEOUT_MS = 6_000
-    private val COUNTRY_REGEX = Regex("\"country\"\\s*:\\s*\"([A-Za-z]{2})\"")
+    private val COUNTRY_REGEX = Regex("\"country_code\"\\s*:\\s*\"([A-Za-z]{2})\"")
     private val proxyCredentials = AtomicReference<PasswordAuthentication?>(null)
     private val clients = ConcurrentHashMap<Int, HttpClient>()
 

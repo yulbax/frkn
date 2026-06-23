@@ -12,11 +12,11 @@ import coil.compose.AsyncImage
 @Composable
 fun CountryFlag(country: String) {
     AsyncImage(
-        model = "https://flagcdn.com/w40/${country.lowercase()}.png",
+        model = "https://flagcdn.com/w80/${country.lowercase()}.png",
         contentDescription = country,
         modifier = Modifier
-            .width(28.dp)
-            .height(20.dp)
+            .width(36.dp)
+            .height(26.dp)
             .clip(RoundedCornerShape(3.dp))
     )
 }
